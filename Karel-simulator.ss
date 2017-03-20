@@ -285,14 +285,75 @@
       (define (test-coordinates a e) (+ (abs (- (car a) (car e))) (abs (- (cadr a) (cadr e)))))
       (+ (test-orientation (cadr act) (cadr exp)) (test-coordinates (car act) (car exp)))
       )
-    (+ (test-map (car actual) (car expected)) (test-robot (cdr actual) (cdr expected)))
+    (list (test-map (car actual) (car expected)) (test-robot (cdr actual) (cdr expected)))
+    )
+
+  (define (testProgram program)
+    (define (testPairs program pairs manhattan state command-length)
+      (if (null? pairs) (list manhattan state command-length)
+          (let* ((our-pair (car pairs))
+                 (source (car our-pair))
+                 (goal (cadr our-pair))
+                 (simulation (simulate source 'start program limit))
+                 (result (test-state (cadr simulation) goal))
+                 (new-manhattan (+ manhattan (car result)))
+                 (new-state (+ state (cadr result)))
+                 (new-command-length (+ command-length (length (car simulation)))))
+
+            (if (or (> new-manhattan (car thresholds)) (> new-state (cadr thresholds)) (> new-command-length (cadddr thresholds)))
+                (list -1 -1 -1 -1)
+                (testPairs program (cdr pairs) new-manhattan new-state new-command-length)
+                )
+            )
+          )
+      )
+    (let ((command-length (get-commands program)))
+      (if (> command-length (caddr thresholds))
+          (list -1 -1 -1 -1)
+          (let ((result (testPairs program pairs 0 0 0)))
+            (list (car result) (cadr result) (get-commands program) (caddr result))
+            )
+          )
+      )
+    )
+
+  (define (is-less? elem other)
+    (let ((elem-1 (car elem))
+          (elem-2 (cadr elem))
+          (elem-3 (caddr elem))
+          (elem-4 (cadddr elem))
+          (other-1 (car other))
+          (other-2 (cadr other))
+          (other-3 (caddr other))
+          (other-4 (cadddr other)))
+      (cond
+        ((< other-1 elem-1) #f)
+        ((< other-2 elem-2) #f)
+        ((< other-3 elem-3) #f)
+        ((< other-4 elem-4) #f)
+        (else #t)
+        )
+      )
     )
   
+  (define (insert-sort element list)
+    (if (null? list) (cons element list)
+        (if (not (is-less? element (car list))) (cons element list)
+            (cons (car list) (insert-sort element (cdr list))))))
   
+  
+  (define (evaluatePrograms)
+    
+    )
+  
+  (testProgram programs)
   
 
   ;For testing only
   )
+
+
+
 
     
     
@@ -332,4 +393,75 @@
 
 (define simple-rule-2
   '(turn-left (if (north?) (step turn-left) (turn-left step)) step))
+
+(define pairs
+  '(
+    (
+     (((w w w w w w) 
+       (w 0 w 0 w w) 
+       (w 1 w 0 0 w) 
+       (w 1 0 0 w w) 
+       (w w w w w w)) 
+      (1 3) south)
+
+     (((w w w w w w) 
+       (w 0 w 0 w w) 
+       (w 0 w 0 0 w) 
+       (w 0 0 0 w w) 
+       (w w w w w w)) 
+      (1 1) north)
+     )
+    (
+     (((w w w w w w) 
+       (w 0 w 0 w w) 
+       (w 0 w 2 0 w) 
+       (w 1 3 0 w w) 
+       (w w w w w w)) 
+      (3 3) north)
+
+     (((w w w w w w) 
+       (w 0 w 0 w w) 
+       (w 0 w 0 0 w) 
+       (w 0 0 0 w w) 
+       (w w w w w w)) 
+      (1 1) north)
+     ))
+  )
+
+(define stuff '((procedure start (put-mark (if wall? turn-left step) start))))
+
+(define get-maze
+  '(
+    (w w w w w w)
+    (w 0 w 0 w w)
+    (w 0 w 0 0 w)
+    (w 0 0 0 w w)
+    (w w w w w w)
+    )
+  )
+(define right-hand-rule-prg
+  '(
+    (procedure start
+               ( turn-right
+                 (if wall?
+                     ( turn-left
+                       (if wall?
+                           (turn-left
+                            (if wall?
+                                turn-left
+                                step
+                                )
+                            )
+                           step
+                           )
+                       )
+                     step  
+                     )
+                 put-mark
+                 start
+                 )
+               )   
+    (procedure turn-right (turn-left turn-left turn-left))
+    )
+  )
 ;----------
