@@ -342,11 +342,16 @@
             (cons (car list) (insert-sort element (cdr list))))))
   
   
-  (define (evaluatePrograms)
-    
+  (define (evaluatePrograms programs)
+    (let ((result (testProgram (car programs))))
+	(if (equal? result '(-1 -1 -1 -1))
+		(evaluatePrograms (cdr programs))
+		(insert-sort result (evaluatePrograms (cdr programs)))
+		)
+	)		 
     )
   
-  (testProgram programs)
+  (evaluatePrograms programs)
   
 
   ;For testing only
