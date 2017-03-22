@@ -172,6 +172,7 @@
       (cond
         ((> depth limit) error-output)
         ((null? expression-list) (list executed-commands current-state '0))
+        ((not (list? expression-list)) (parse-expressions (list expression-list) current-state executed-commands depth))
         ((equal? (car expression-list) 'step)
          (if (wall? current-state)
              ;It crashed:
@@ -318,155 +319,41 @@
     )
 
   (define (is-less? elem other)
-    (let ((elem-1 (car elem))
-          (elem-2 (cadr elem))
-          (elem-3 (caddr elem))
-          (elem-4 (cadddr elem))
-          (other-1 (car other))
-          (other-2 (cadr other))
-          (other-3 (caddr other))
-          (other-4 (cadddr other)))
-      (cond
-        ((< other-1 elem-1) #f)
-        ((< other-2 elem-2) #f)
-        ((< other-3 elem-3) #f)
-        ((< other-4 elem-4) #f)
-        (else #t)
-        )
-      )
-    )
+    (cond
+      ((null? elem) #f)
+      ((< (car elem) (car other)) #t)
+      ((> (car elem) (car other)) #f)
+      (else (is-less? (cdr elem) (cdr other)))))
   
   (define (insert-sort element list)
     (if (null? list) (cons element list)
-        (if (not (is-less? element (car list))) (cons element list)
+        (if (is-less? (car element) (caar list)) (cons element list)
             (cons (car list) (insert-sort element (cdr list))))))
+
+
+  (define (is-invalid? result)
+    (cond ((null? result) #f)
+          ((equal? (car result) '-1) #t)
+          (else (is-invalid? (cdr result)))))
   
   
   (define (evaluatePrograms programs)
-    (let ((result (testProgram (car programs))))
-	(if (equal? result '(-1 -1 -1 -1))
-		(evaluatePrograms (cdr programs))
-		(insert-sort result (evaluatePrograms (cdr programs)))
-		)
-	)		 
+    (if (null? programs) '()
+        (let ((result (testProgram (car programs))))
+          (if (is-invalid? result)
+              (evaluatePrograms (cdr programs))
+              (insert-sort (list result (car programs)) (evaluatePrograms (cdr programs)))
+              )
+          )		 
+        )
     )
   
   (evaluatePrograms programs)
   
-
-  ;For testing only
   )
 
 
 
 
-    
-    
-;TEST-----
-(define right-hand-rule-prg
-  '(
-    (procedure start
-               ( turn-right
-                 (if wall?
-                     ( turn-left
-                       (if wall?
-                           (turn-left
-                            (if wall?
-                                turn-left
-                                step
-                                )
-                            )
-                           step
-                           )
-                       )
-                     step  
-                     )
-                 put-mark
-                 start
-                 )
-               )   
-    (procedure turn-right (turn-left turn-left turn-left))
-    )
-  )
-
-(define test-1
-  '((procedure start (put-mark (if wall? turn-left step) start)))
-  )
-
-(define simple-rule
-  '(turn-left turn-left step turn-left))
-
-(define simple-rule-2
-  '(turn-left (if (north?) (step turn-left) (turn-left step)) step))
-
-(define pairs
-  '(
-    (
-     (((w w w w w w) 
-       (w 0 w 0 w w) 
-       (w 1 w 0 0 w) 
-       (w 1 0 0 w w) 
-       (w w w w w w)) 
-      (1 3) south)
-
-     (((w w w w w w) 
-       (w 0 w 0 w w) 
-       (w 0 w 0 0 w) 
-       (w 0 0 0 w w) 
-       (w w w w w w)) 
-      (1 1) north)
-     )
-    (
-     (((w w w w w w) 
-       (w 0 w 0 w w) 
-       (w 0 w 2 0 w) 
-       (w 1 3 0 w w) 
-       (w w w w w w)) 
-      (3 3) north)
-
-     (((w w w w w w) 
-       (w 0 w 0 w w) 
-       (w 0 w 0 0 w) 
-       (w 0 0 0 w w) 
-       (w w w w w w)) 
-      (1 1) north)
-     ))
-  )
-
-(define stuff '((procedure start (put-mark (if wall? turn-left step) start))))
-
-(define get-maze
-  '(
-    (w w w w w w)
-    (w 0 w 0 w w)
-    (w 0 w 0 0 w)
-    (w 0 0 0 w w)
-    (w w w w w w)
-    )
-  )
-(define right-hand-rule-prg
-  '(
-    (procedure start
-               ( turn-right
-                 (if wall?
-                     ( turn-left
-                       (if wall?
-                           (turn-left
-                            (if wall?
-                                turn-left
-                                step
-                                )
-                            )
-                           step
-                           )
-                       )
-                     step  
-                     )
-                 put-mark
-                 start
-                 )
-               )   
-    (procedure turn-right (turn-left turn-left turn-left))
-    )
-  )
 ;----------
+
