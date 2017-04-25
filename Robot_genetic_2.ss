@@ -480,7 +480,7 @@
       
       (define (add-if)
         (define (get-question)
-          (let ((rand (random 5)))
+          (let ((rand (random 7)))
             (cond
               ((< rand 3) 'wall?)
               ((< rand 5) 'north?)
@@ -489,13 +489,13 @@
             '(if wall? (turn-left) (step))
             (list 'if (get-question) (list (add-call)) (list (add-call)))))
       
-      (let ((rand (random 14)))
+      (let ((rand (random 16)))
         (cond
           ((< rand 6) 'step)
           ((< rand 9) 'turn-left)
           ((= rand 9) (add-procedure-call))
-          ((= rand 10) 'put-mark)
-          ((= rand 11) 'get-mark)
+          ((< rand 11) 'put-mark)
+          ((< rand 13) 'get-mark)
           (else (add-if)))))
     
     (define (add-procedure)
@@ -583,7 +583,7 @@
       
       (select-procedure))
     
-    (if (= (random 8) 0)
+    (if (= (random 6) 0)
         (add-procedure)
         (add-element)))
 
@@ -600,7 +600,7 @@
                (list 'if (cadr procedure) (go-to (caddr procedure) (random (length (caddr procedure)))) (cadddr procedure))
                (list 'if (cadr procedure) (caddr procedure) (go-to (cadddr procedure) (random (length (cadddr procedure)))))))
           ((list? (car procedure))
-           (if (= (random 6) 0) (cdr procedure)
+           (if (= (random 5) 0) (cdr procedure)
                (if (null? (car procedure)) '()
                    (if (equal? (caar procedure) 'if) (cons (stand-on (car procedure)) (cdr procedure))
                        (go-to (car procedure) (random (length (car procedure))))))))
@@ -641,7 +641,7 @@
 <stack_size>
     is the limit on the robot simulator stack size. |#
 (define (evolve pairs thresholds stack-size)
-  (define (POPSIZE) 300)
+  (define (POPSIZE) 600)
   (define (create-initial)
     (define (get-start) '(
                           ((procedure start (step)))
@@ -663,6 +663,19 @@
                           ((procedure start (put-mark (if wall? (turn-left) (step)) start)))
                           ((procedure start (turn-north go)) (procedure go ((if wall? () (step go)))) (procedure turn-north ((if north? () (turn-left turn-north)))))
                           ((procedure start (go-north go)) (procedure go ((if wall? (turn-left go) (step go-north go)))) (procedure go-north ((if north? () (turn-left go-north)))))
+                          ((procedure start (put-mark (if mark? (turn-left turn-left) ()) step put-mark)))
+                          ((procedure start (() turn-left turn-left turn-left)))
+                          ((procedure start ((if north? (start) ()) turn-left start)))
+                          ((procedure start ((if wall? () (2)) put-mark)) (procedure 2 (step start step)))
+                          ((procedure start (step step step put-mark)))
+                          ((procedure start (put-mark (if wall? (turn-left) (step)) start)))
+                          ((procedure start ((if wall? (put-mark) (step start turn-left turn-left step turn-left turn-left)))))
+                          ((procedure start ((if wall? (put-mark) (step start)))))
+                          ((procedure start put-mark))
+                          ((procedure start ((if wall? (put-mark) (step)))))
+                          ((procedure start (go-north go)) (procedure go ((if wall? (turn-left go) (step go-north go)))) (procedure go-north ((if north? () (turn-left go-north)))))
+                          ((procedure start (turn-north go)) (procedure go ((if wall? () (step go)))) (procedure turn-north ((if north? () (turn-left turn-north)))))
+                          ((procedure start (if wall? (put-mark) (step start turn-left turn-left step turn-left turn-left))))
                           ))
     
     (define (load-start population)
@@ -687,7 +700,7 @@
             output)))
     
     (define (next-wave new-population len)
-      (if (>= len (POPSIZE)) (let ((result (map mutate new-population))) (if (= (random 10) 0) (map mutate result) result))
+      (if (>= len (POPSIZE)) (let ((result (map mutate new-population))) (if (= (random 6) 0) (map mutate result) result))
           (next-wave (cons (get-from-percentage (+ (* (random 9) 10) 10)) new-population) (+ len 1))))
     
     (if (< (length population) (POPSIZE)) (get-next-pop (cons (get-nth old-pop (random (length old-pop))) population) old-pop) 
@@ -703,4 +716,4 @@
           (begin (display (list best-score best-code)) (newline) (flush-output) (eval-pop (get-next-pop new-pop population) best-score))
           (eval-pop (get-next-pop new-pop population) best))))
   
-  (eval-pop (create-initial) '(999999 0 0 0)))
+  (eval-pop (create-initial) '(9999999 0 0 0)))
