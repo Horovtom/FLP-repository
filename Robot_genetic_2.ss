@@ -303,6 +303,7 @@
     )
   
   (define (testProgram program)
+    ;(display "Testing: ") (newline) (display program) (newline)
     (define (testPairs program pairs manhattan state command-length)
       (if (null? pairs) (list manhattan state command-length)
           (let* ((our-pair (car pairs))
@@ -380,51 +381,80 @@
         (get-procedure-list-inner (cons (cadar prog) ls) (cdr prog))))
   (get-procedure-list-inner '() program))
 
-
-#|
-;Remove empty procedures (except for start procedure)
-;Remove uncalled procedures (except for start procedure)
-;Erase empty brackets
-;Bracket (procedure start (if wall? () ())) -> (procedure start ((if wall? () ()))
-;Bracket (if wall? step step) -> (if wall? (step) (step))
-(define (validate program)
-  (define (remove-proc name) ;Searches for calls and deletes them
-    (define (inner-procedures prog)
-      (define (inner prog)
-        (if (null? prog) prog
-            (if (list? prog)
-                (cons (inner (car prog)) (cdr prog))
-                (if (equal? prog name) '() prog))))
-      
-      (cond
-        ((null? prog) prog)
-        ((equal? (cadar prog) name) (inner-procedures (cdr prog)))
-        (else
-         (cons (list 'procedure (cadar prog) (inner (caddar prog))) (inner-procedures (cdr prog))))))
-    
-    (inner-procedures program))
-  
-  (define (remove-empty-proc prog) ;Removes empty procedures and fixes lowest if
-    (cond
-      ((null? prog) prog)
-      ((equal? (cadar prog) 'start) (cons (car prog) (remove-empty-proc (cdr prog))))
-      ((null? (caddar prog)) (validate (remove-proc (cadar prog))))
-      ((equal? (car (caddar prog)) 'if) (cons (list 'procedure (cadar prog) (list (caddar prog))) (remove-empty-proc (cdr prog))))
-      (else
-       (cons (car prog) (remove-empty-proc (cdr prog))))))
-  
-  
-  (remove-empty-proc program)
-  )
-|#
-
 (define (contains? ls elem)
   (if (null? ls) #f
-  (if (equal? (car ls) elem)
-      #t
-      (contains? (cdr ls) elem)
-  )))
+      (if (equal? (car ls) elem)
+          #t
+          (contains? (cdr ls) elem)
+          )))
 
+(define (validate prog)
+  ;(display "Validating: ") (display prog) (newline) (flush-output)
+  (define (remove-additional-brackets prog)
+    (if (null? prog) prog
+        (if (not (list? prog)) prog
+            (if (list? (car prog))
+                (if (null? (car prog)) (remove-additional-brackets (cdr prog))
+                    (if (equal? (caar prog) 'if)
+                        (cons (list 'if (cadar prog)
+                                    (if (not (list? (caddar prog))) (list (remove-additional-brackets (caddar prog)))
+                                        (remove-additional-brackets (caddar prog)))
+                                    (if (not (list? (car (cdddar prog)))) (list (remove-additional-brackets (car (cdddar prog))))
+                                        (remove-additional-brackets (car (cdddar prog)))))
+                              (remove-additional-brackets (cdr prog)))
+                        (remove-additional-brackets (append (car prog) (cdr prog)))))
+                (if (equal? (car prog) 'if)
+                    (list 'if (cadr prog)
+                          (if (not (list? (caddr prog))) (list (caddr prog))
+                              (remove-additional-brackets (cadddr prog)))
+                          (if (not (list? (cadddr prog))) (list (cadddr prog))
+                              (remove-additional-brackets (cadddr prog))))
+                         
+
+                    (cons (car prog) (remove-additional-brackets (cdr prog))))))))
+
+  (define (remove-empty-procedures prog)
+
+    (define (remove-procedure name)
+
+      (define (inner left right)
+
+        (define (inner-procedure procedure)
+          (if (null? procedure) procedure
+              (if (not (list? procedure))
+                  (if (equal? name procedure) '() procedure)
+                  (if (null? (car procedure)) (cons '() (inner-procedure (cdr procedure)))
+                      (if (list? (car procedure)) (cons (inner-procedure (car procedure)) (inner-procedure (cdr procedure)))
+                          (if (equal? (car procedure) name) (inner-procedure (cdr procedure))
+                              (cons (car procedure) (inner-procedure (cdr procedure)))))))))
+          
+        (if (null? right) (remove-empty-procedures left)
+            (if (equal? (cadar right) name) (inner left (cdr right))
+                (inner (cons (list 'procedure (cadar right) (inner-procedure (caddar right))) left) (cdr right)))))
+      (inner '() prog))
+    
+    (define (browse-procedures procedures)
+      (if (null? procedures) prog
+          (if (equal? (cadar procedures) 'start) (browse-procedures (cdr procedures))
+              (if (null? (caddar procedures)) (remove-procedure (cadar procedures))
+                  (browse-procedures (cdr procedures))))))
+    
+    (browse-procedures prog))
+  
+  (define (for-each-procedure prog call)
+    (if (null? prog) prog
+        (cons (list 'procedure (cadar prog)
+                    (if (not (list? (caddar prog)))
+                        (list (caddar prog))
+                        (if (null? (caddar prog)) '()
+                            (if (equal? (car (caddar prog)) 'if) (call (list (caddar prog))) (call (caddar prog))))))
+              (for-each-procedure (cdr prog) call))))
+  
+  (for-each-procedure (remove-empty-procedures (for-each-procedure prog remove-additional-brackets)) remove-additional-brackets)
+  ;(for-each-procedure prog remove-additional-brackets)
+  )
+
+#|
 (define (validate prog)
   (define (has-call? prog call)
     (cond
@@ -485,21 +515,6 @@
     (if (null? prog) prog
         (if (not (list? (caddar prog))) (cons (list 'procedure (cadar prog) (caddar prog)) (bracket-singles (cdr prog)))
             (cons (list 'procedure (cadar prog) (inner (caddar prog))) (bracket-singles (cdr prog))))))
-  #|
-  (define (bracket-singles prog)
-    (cond
-      ((null? prog) prog)
-      ((list? prog)
-       (if (equal? (car prog) 'if)
-           (if (not (list? (caddr prog)))
-               (if (not (list? (cadddr prog)))
-                   (list 'if (cadr prog) (list (caddr prog)) (list (cadddr prog)))
-                   (list 'if (cadr prog) (list (caddr prog)) (bracket-singles (cadddr prog))))
-               (if (not (list? (cadddr prog)))
-                   (list 'if (cadr prog) (bracket-singles (caddr prog)) (list (cadddr prog)))
-                   (list 'if (cadr prog) (bracket-singles (caddr prog)) (bracket-singles (cadddr prog)))))
-           (cons (bracket-singles (car prog)) (bracket-singles (cdr prog)))))
-      (else prog))) |#
 
   (define (has-start prog)
     (let ((ls (get-procedure-list prog)))
@@ -509,9 +524,10 @@
   
   (if (null? prog) '((procedure start ()))
       (has-start (bracket-singles (erase-empty-brackets (erase-empty-procedures (validate-procedures prog (get-procedure-list prog))))))))
-
+|#
 
 (define (mutate program)
+  ;(display "Mutating: ") (newline) (display program) (newline)
   (validate (call-mutate (validate program))))
 
 (define (call-mutate program)
@@ -559,12 +575,27 @@
       ;Create function with random call
       ;Place function call at random place of 1st level
       (define (place-call func-name program)
-        (let* ((first-func (car program))
-               (first-name (cadr first-func))
-               (first-code (caddr first-func)))
-          (if (list? first-code)
-              (cons (list 'procedure first-name (cons func-name first-code)) (cdr program))
-              (cons (list 'procedure first-name (list func-name first-code)) (cdr program)))))
+        (define (place-in-procedure procedure)
+          (define (goto-place prog index)
+            (if (= index 0) (cons (inner (car prog)) (cdr prog))
+                (cons (car prog) (goto-place (cdr prog) (- index 1)))))
+            
+          (define (inner prog)
+            (if (null? prog) func-name
+                (if (not (list? prog))
+                    (if (= (random 2) 0) (list prog func-name) (list func-name prog))
+                    (if (equal? (car prog) 'if)
+                        (if (= (random 2) 0) (list 'if (cadr prog) (inner (caddr prog)) (cadddr prog)) (list 'if (cadr prog) (caddr prog) (inner (cadddr prog))))
+                        (goto-place prog (random (length prog)))))))
+          
+          (list 'procedure (cadr procedure) (inner (caddr procedure))) 
+          )
+        (define (select-procedure)
+          (define (inner prog index)
+            (if (= index 0) (cons (place-in-procedure (car prog)) (cdr prog))
+                (cons (car prog) (inner (cdr prog) (- index 1)))))
+          (inner program (random (length program))))
+        (select-procedure))
       
       (define (createProcedure)
         (let ((name (+ (get-highest-procedure) 1)))
@@ -625,10 +656,52 @@
       
       (select-procedure))
     
-    (if (= (random 7) 0)
+    (if (= (random 8) 0)
         (add-procedure)
         (add-element)))
 
+  (define (remove)
+  
+    (define (find-call procedure)
+      
+      (define (stand-on procedure)
+        (cond
+          ((null? procedure) procedure)
+          ((not (list? procedure)) '())
+          ((equal? 'if (car procedure))
+           (if (= (random 2) 0)
+               (list 'if (cadr procedure) (go-to (caddr procedure) (random (length (caddr procedure)))) (cadddr procedure))
+               (list 'if (cadr procedure) (caddr procedure) (go-to (cadddr procedure) (random (length (cadddr procedure)))))))
+          ((list? (car procedure))
+           (if (= (random 6) 0) (cdr procedure)
+               (if (null? (car procedure)) '()
+                   (if (equal? (caar procedure) 'if) (cons (stand-on (car procedure)) (cdr procedure))
+                       (go-to (car procedure) (random (length (car procedure))))))))
+           
+          ((not (list? (car procedure))) (cdr procedure))
+          (else (display "WTF: ") (display procedure) (newline)
+           
+                )))
+      
+      (define (go-to procedure index)
+        (if (null? procedure) procedure
+            (if (equal? (car procedure) 'if) (stand-on procedure)
+                (if (= index 0) (stand-on procedure)
+                    (cons (car procedure) (go-to (cdr procedure) (- index 1)))))))
+      
+      (if (list? procedure) (go-to procedure (random (length procedure)))
+          '()))
+      
+      
+    
+    (define (select-procedure prog index)
+      (if (= index 0) (cons (list 'procedure (cadar prog) (find-call (caddar prog))) (cdr prog))
+          (cons (car prog) (select-procedure (cdr prog) (- index 1)))))
+
+    (select-procedure program (random (length program))))
+  
+  
+  #|
   (define (remove)
     (define (find-call procedure)
       (define (inner procedure)
@@ -636,6 +709,7 @@
           (if (null? procedure) '()
               (if (= index 0) 
                   (if (list? (car procedure))
+                      (if (not (null? (car procedure)))
                       (if (not (equal? 'if (caar procedure)))
                           (cons (cdar procedure) (cdr procedure))
                           (if (= (random 4) 0) (cdr procedure)
@@ -658,8 +732,8 @@
       (if (= index 0) (cons (find-call (car prog)) (cdr prog))
           (cons (car prog) (select-procedure (cdr prog) (- index 1)))))
 
-    (select-procedure program (random (length program))))
-  
+    (select-procedure program (random (length program)))))
+  |#
   #|
   (define (remove)
     (define (find-call procedure)
@@ -687,7 +761,7 @@
     (select-procedure program (random (length program))))
   |#
   
-  (if (null? program) '((procedure start ()))
+  (if (null? program) '((procedure start (if north? (step start) (turn-left start))))
       (if (> (random 2) 0)
           (validate (add))
           (validate (remove)))))
@@ -701,7 +775,7 @@
 <stack_size>
     is the limit on the robot simulator stack size. |#
 (define (evolve pairs thresholds stack-size)
-  (define (POPSIZE) 1000)
+  (define (POPSIZE) 300)
   (define (create-initial)
     (define (get-start) '(
                           ((procedure start (step)))
@@ -759,9 +833,7 @@
            (best-score (caar result))
            (new-pop (map (lambda (n) (cadr n)) result))
            (best-code (car new-pop)))
-      
-      (if (> 2 (length result)) ((display population) (newline)))
-      (if (is-less? best-score best)
+      (if (and (not (equal? best-code '((procedure start ())))) (not (null? best-code)) (is-less? best-score best))
           (begin (display (list best-score best-code)) (newline) (flush-output) (eval-pop (get-next-pop new-pop population) best-score))
           (eval-pop (get-next-pop new-pop population) best))))
   
