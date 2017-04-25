@@ -451,80 +451,7 @@
               (for-each-procedure (cdr prog) call))))
   
   (for-each-procedure (remove-empty-procedures (for-each-procedure prog remove-additional-brackets)) remove-additional-brackets)
-  ;(for-each-procedure prog remove-additional-brackets)
   )
-
-#|
-(define (validate prog)
-  (define (has-call? prog call)
-    (cond
-      ((equal? call 'start) #t)
-      ((null? prog) #f)
-      ((equal? prog call) #t)
-      ((list? prog) (or (has-call? (car prog) call) (has-call? (cdr prog) call)))
-      (else #f)))
-  
-  (define (remove-procedure-call procedure call)
-    (cond
-      ((null? procedure) procedure)
-      ((equal? procedure call) '())
-      ((list? procedure) (cons (remove-procedure-call (car procedure) call) (remove-procedure-call (cdr procedure) call)))
-      (else procedure)))
-  
-  (define (remove-procedure prog procedure)
-    (if (null? prog) prog
-        (if (equal? (cadar prog) procedure) (cdr prog)
-            (cons (remove-procedure-call (car prog) procedure) (remove-procedure (cdr prog) procedure)))))
-  
-  (define (validate-procedures prog procedure-list)
-    (if (null? procedure-list) prog
-        (if (has-call? prog (car procedure-list)) (validate-procedures prog (cdr procedure-list))
-            (validate-procedures (remove-procedure prog (car procedure-list)) (cdr procedure-list)))))
-  
-  (define (erase-empty-procedures program)
-    (define (inner prog)
-      (cond
-        ((null? prog) program)
-        ((equal? (cadar prog) 'start) (inner (cdr prog)))
-        ((null? (caddar prog)) (erase-empty-procedures (remove-procedure program (cadar prog))))
-        (else (inner (cdr prog)))))
-    (inner program))
-
-  (define (erase-empty-brackets prog)
-    (define (inner procedure)
-      (if (or (null? procedure) (not (list? procedure))) procedure
-          (if (list? (car procedure))
-              (if (null? (car procedure)) (inner (cdr procedure))
-                  (if (equal? (caar procedure) 'if) (cons (list 'if (cadar procedure) (inner (caddar procedure)) (inner (car (cdddar procedure)))) (inner (cdr procedure)))
-                      (cons (inner (car procedure)) (inner (cdr procedure)))))
-              (cons (car procedure) (inner (cdr procedure))))))
-    
-    (if (null? prog) prog
-        (cons (list 'procedure (cadar prog) (inner (caddar prog))) (erase-empty-brackets (cdr prog)))
-        ))
-
-  (define (bracket-singles prog)
-    (define (inner procedure)
-      (if (null? procedure) procedure
-          (if (list? procedure)
-              (if (equal? 'if (car procedure))
-                  (list 'if (cadr procedure) (inner (caddr procedure)) (inner (car (cdddr procedure))))
-                  (cons (inner (car procedure)) (inner (cdr procedure))))
-              procedure)))
-
-    (if (null? prog) prog
-        (if (not (list? (caddar prog))) (cons (list 'procedure (cadar prog) (caddar prog)) (bracket-singles (cdr prog)))
-            (cons (list 'procedure (cadar prog) (inner (caddar prog))) (bracket-singles (cdr prog))))))
-
-  (define (has-start prog)
-    (let ((ls (get-procedure-list prog)))
-      (if (not (contains? ls 'start))
-          (cons (list 'procedure 'start (list (car ls))) prog)
-          prog)))
-  
-  (if (null? prog) '((procedure start ()))
-      (has-start (bracket-singles (erase-empty-brackets (erase-empty-procedures (validate-procedures prog (get-procedure-list prog))))))))
-|#
 
 (define (mutate program)
   ;(display "Mutating: ") (newline) (display program) (newline)
@@ -699,67 +626,6 @@
           (cons (car prog) (select-procedure (cdr prog) (- index 1)))))
 
     (select-procedure program (random (length program))))
-  
-  
-  #|
-  (define (remove)
-    (define (find-call procedure)
-      (define (inner procedure)
-        (define (inner-browse procedure index)
-          (if (null? procedure) '()
-              (if (= index 0) 
-                  (if (list? (car procedure))
-                      (if (not (null? (car procedure)))
-                      (if (not (equal? 'if (caar procedure)))
-                          (cons (cdar procedure) (cdr procedure))
-                          (if (= (random 4) 0) (cdr procedure)
-                              (if (= (random 2) 0)
-                                  (cons (list 'if (cadar procedure) (inner-browse (caddar procedure) (random (length (caddar procedure)))) (car (cdddar procedure))) (cdr procedure))
-                                  (cons (list 'if (cadar procedure) (caddar procedure) (inner-browse (car (cdddar procedure)) (random (length (car (cdddar procedure)))))) (cdr procedure)))))
-                      (cdr procedure))
-                  (cons (car procedure) (inner-browse (cdr procedure) (- index 1))))))
-          
-        (if (or (not (list? procedure)) (null? procedure)) '()
-            (if (equal? (car procedure) 'if)
-                (if (= (random 2) 0)
-                    (list 'if (cadr procedure) (inner-browse (caddr procedure) (random (length (caddr procedure)))) (cadddr procedure))
-                    (list 'if (cadr procedure) (caddr procedure) (inner-browse (cadddr procedure) (random (length (cadddr procedure))))))
-                (inner-browse procedure (random (length procedure))))))
-  
-      (list 'procedure (cadr procedure) (inner (caddr procedure))))
-    
-    (define (select-procedure prog index)
-      (if (= index 0) (cons (find-call (car prog)) (cdr prog))
-          (cons (car prog) (select-procedure (cdr prog) (- index 1)))))
-
-    (select-procedure program (random (length program)))))
-  |#
-  #|
-  (define (remove)
-    (define (find-call procedure)
-      (define (find-call-inner procedure index)
-        (display procedure) (newline)
-        (if (null? procedure) procedure
-            (if (= index 0)
-                (if (list? (car procedure))
-                    (if (= (random 4) 0) (cdr procedure)
-                        (if (= (random 2) 0) (cons (list 'if (cadar procedure) (find-call-inner (caddar procedure) (random (length (caddar procedure)))) (car (cdddar procedure))) (cdr procedure))
-                            (cons (list 'if (cadar procedure) (caddar procedure) (find-call-inner
-                                                                                  (car (cdddar procedure)) (random (length (car (cdddar procedure)))))) (cdr procedure))))
-                    (cdr procedure))
-                (cons (car procedure) (find-call-inner (cdr procedure) (- index 1))))))
-      
-      (if (list? (caddr procedure))
-          (list 'procedure (cadr procedure) (find-call-inner (caddr procedure) (random (length (caddr procedure)))))
-          (find-call (list 'procedure (cadr procedure) (list (caddr procedure))))))
-    
-    
-    (define (select-procedure prog index)
-      (if (= index 0) (cons (find-call (car prog)) (cdr prog))
-          (cons (car prog) (select-procedure (cdr prog) (- index 1)))))
-    
-    (select-procedure program (random (length program))))
-  |#
   
   (if (null? program) '((procedure start (if north? (step start) (turn-left start))))
       (if (> (random 2) 0)
